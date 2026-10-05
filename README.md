@@ -1,49 +1,67 @@
 # QASPER RAG
 
-A local research-paper question-answering project using QASPER.
-Currently implements document preprocessing, embedding generation,
-retrieval, and retrieval evaluation. LLM answer generation is planned.
+A work-in-progress retrieval-augmented question-answering project using scientific papers from QASPER.
 
 ## Pipeline
 
-1. Extract paragraphs while preserving paper and section metadata.
-2. Split long paragraphs into chunks of up to 250 tokens with 40-token overlap.
-3. Generate normalized embeddings using Sentence Transformers.
-4. Retrieve passages using FAISS, BM25, or reciprocal rank fusion.
-5. Evaluate retrieval against QASPER evidence annotations.
+1. Load the train, validation, and test splits.
+2. Extract paragraphs and preserve their source metadata.
+3. Create chunks of up to 250 tokens with 40-token overlap.
+4. Prepare question and evidence labels.
+5. Compare BM25, MiniLM embedding retrieval, and hybrid reciprocal rank fusion.
+6. Rerank hybrid’s top 20 candidates with a pretrained cross-encoder.
 
-## Initial validation results
+## Validation results
 
-MiniLM retrieval evaluated within each question's paper:
+Evaluated on 888 questions with mapped evidence. Retrieval is restricted to each question’s paper.
 
-| Method | Hit@1 | Hit@5 | Hit@10 |
-|--------|-------|-------|--------|
-| BM25 | 0.213 | 0.581 | 0.753 |
-| Embeddings | 0.225 | 0.611 | 0.784 |
+| Method | Hit@1 | Hit@5 | Hit@10 | Hit@20 |
+|---|---:|---:|---:|---:|
+| BM25 | 21.3% | 58.1% | 75.3% | — |
+| MiniLM | 22.5% | 61.1% | 78.4% | — |
+| Hybrid RRF | 26.2% | 65.2% | 81.1% | 93.8% |
+| Hybrid + cross-encoder | **35.5%** | **72.9%** | **86.4%** | **93.8%** |
 
-Evaluated 888 questions; skipped 117 without mapped evidence.
-A hit means a retrieved chunk belongs to an annotated evidence
-paragraph. This metric does not measure answer accuracy.
-Evidence from multiple annotators is pooled.
+Hit@k measures whether at least one of the top k retrieved chunks belongs to a mapped gold-evidence paragraph.
 
-Hybrid retrieval and BGE embeddings are being explored.
+Cross-encoder reranking improves Hit@1 by 9.3 percentage points and Hit@10 by 5.3 points over hybrid retrieval. Hit@20 remains unchanged because reranking preserves the candidate set.
+
+## Models
+
+- **BM25:** keyword retrieval using corpus term statistics.
+- **Bi-encoder:** `sentence-transformers/all-MiniLM-L6-v2`.
+- **Cross-encoder:** `cross-encoder/ms-marco-MiniLM-L6-v2`.
+- **Hybrid fusion:** reciprocal rank fusion with rank constant 60.
+
+Both neural models use pretrained weights without fine-tuning.
 
 ## Files
 
-- rag_work.ipynb: implementation and experiments
-- data/: downloaded QASPER splits, excluded from Git
-- artifacts/: saved chunks, embeddings, indexes, and results, excluded from Git
+- `rag_updated.ipynb`: current preprocessing and retrieval experiments.
+- `rag_draft.ipynb`: earlier implementation.
+- `data/`: local QASPER Parquet files.
+- `artifacts/`: generated preprocessing outputs, caches, and evaluation results.
 
-## Setup
+## Local setup
 
-Use Python 3.11 and install:
+Install the notebook dependencies:
 
-    python -m pip install pandas pyarrow datasets sentence-transformers faiss-cpu rank-bm25 tqdm
+```bash
+pip install jupyter pandas numpy pyarrow transformers sentence-transformers rank_bm25 tqdm
+```
 
-Place the downloaded Parquet splits in data/, update the notebook
-paths to match their filenames, and run the notebook in order.
-Save generated embeddings before closing the kernel.
+Place the dataset files in `data/`:
 
-## Dataset
+```text
+train_qasper.parquet
+validation_qasper.parquet
+test_qasper.parquet
+```
 
-https://huggingface.co/datasets/allenai/qasper
+Open `rag_updated.ipynb`, check the data-path configuration, and run the preprocessing and retrieval cells in order.
+
+## Limitations and next steps
+
+These scores measure paragraph-level evidence retrieval, not answer correctness or complete evidence coverage. Questions without mapped evidence are excluded, and full-corpus retrieval has not been evaluated.
+
+Answer-generation testing is pending. The next experiment compares answers generated from the top 5 versus top 10 reranked chunks, followed by a minimal interface showing answers, citations, and retrieved context.
