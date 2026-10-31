@@ -10,6 +10,7 @@ A work-in-progress retrieval-augmented question-answering project using scientif
 4. Prepare question and evidence labels.
 5. Compare BM25, MiniLM embedding retrieval, and hybrid reciprocal rank fusion.
 6. Rerank hybrid’s top 20 candidates with a pretrained cross-encoder.
+7. Browse retrieval stage by stage, and optionally generate cited answers, in a Streamlit app.
 
 ## Validation results
 
@@ -49,10 +50,10 @@ Both neural models use pretrained weights without fine-tuning.
 
 ## Local setup
 
-Install the notebook dependencies:
+Install the dependencies (add `jupyter` to run the notebook):
 
 ```bash
-pip install jupyter pandas numpy pyarrow transformers sentence-transformers rank_bm25 tqdm
+pip install -r requirements.txt
 ```
 
 Place the dataset files in `data/`:
@@ -91,6 +92,14 @@ Run the tests with `pip install -r requirements-dev.txt && pytest`.
 
 ## Limitations and next steps
 
-These scores measure paragraph-level evidence retrieval, not answer correctness or complete evidence coverage. Questions without mapped evidence are excluded, and full-corpus retrieval has not been evaluated.
+**What the scores measure.** Hit@k is paragraph-level evidence retrieval, not answer correctness or complete evidence coverage. Retrieval is paper-scoped (about 50 chunks per paper), which is much easier than searching the whole corpus, so a random top-10 already hits roughly one question in five. Full-corpus retrieval has not been evaluated, and no random or positional baseline is reported yet.
 
-Answer-generation testing is pending. The next experiment compares answers generated from the top 5 versus top 10 reranked chunks, followed by a minimal interface showing answers, citations, and retrieved context.
+**Which questions are evaluated.** Only the 888 of 1,005 validation questions with at least one evidence entry matched to a paragraph are scored. Questions answered by unanswerable annotations, table or figure captions (`FLOAT SELECTED: Table …`), or bare section headings are excluded, so the hardest cases are likely under-represented. A question counts as a hit if any annotator's evidence is retrieved.
+
+**Reproducibility.** `scripts/regression_check.py` reproduced the notebook's validation labels and the per-question BM25, MiniLM and Hybrid RRF Hit@1/5/10 from the package. Cross-encoder parity is checked separately with `--rerank-n`. All reported numbers come from the validation split; the test split has not been evaluated.
+
+**Next steps.**
+- Answer generation is implemented but untested. The planned experiment compares answers from the top 5 versus top 10 reranked chunks, with manual review of correctness and whether citations support the claims.
+- Add confidence intervals (resampling by paper), random and positional baselines, and an automatic answer metric.
+- Fit BM25 term statistics on the whole split instead of per paper, and compare.
+- Run the test split once, after the configuration is frozen.
