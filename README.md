@@ -24,11 +24,11 @@ Evaluated on 888 questions with mapped evidence. Retrieval is restricted to each
 
 Hit@k measures whether at least one of the top k retrieved chunks belongs to a mapped gold-evidence paragraph.
 
-Cross-encoder reranking improves Hit@1 by 9.3 percentage points and Hit@10 by 5.3 points over hybrid retrieval. Hit@20 remains unchanged because reranking preserves the candidate set.
+Cross-encoder reranking improves Hit@1 by 9.2 percentage points and Hit@10 by 5.3 points over hybrid retrieval. Hit@20 remains unchanged because reranking preserves the candidate set.
 
 ## Models
 
-- **BM25:** keyword retrieval using corpus term statistics.
+- **BM25:** keyword retrieval (`rank_bm25`), fitted separately on each paper's chunks (about 50 per paper), so term statistics are per-paper, not corpus-wide.
 - **Bi-encoder:** `sentence-transformers/all-MiniLM-L6-v2`.
 - **Cross-encoder:** `cross-encoder/ms-marco-MiniLM-L6-v2`.
 - **Hybrid fusion:** reciprocal rank fusion with rank constant 60.
@@ -37,10 +37,15 @@ Both neural models use pretrained weights without fine-tuning.
 
 ## Files
 
-- `rag_updated.ipynb`: current preprocessing and retrieval experiments.
+- `rag_updated.ipynb`: current preprocessing and retrieval experiments (unchanged; it remains the experiment log).
 - `rag_draft.ipynb`: earlier implementation.
-- `data/`: local QASPER Parquet files.
-- `artifacts/`: generated preprocessing outputs, caches, and evaluation results.
+- `qasper_rag/`: the notebook's logic as an importable package (`preprocess`, `retrieval`, `generate`, `artifacts`, `models`, `evaluate`, `config`).
+- `scripts/build_artifacts.py`: builds the chunk, question and vector files the app reads.
+- `scripts/regression_check.py`: checks the package against the notebook's saved validation outputs.
+- `app.py`: Streamlit app.
+- `tests/`: unit and app tests (synthetic data, no model downloads).
+- `data/`: local QASPER Parquet files (not committed).
+- `artifacts/`: generated outputs, caches and app files (not committed).
 
 ## Local setup
 
@@ -59,6 +64,30 @@ test_qasper.parquet
 ```
 
 Open `rag_updated.ipynb`, check the data-path configuration, and run the preprocessing and retrieval cells in order.
+
+## Streamlit app
+
+The app searches inside one selected paper, the same scope as the validation results above. It shows each retrieved chunk with its rank at every stage (BM25, dense, hybrid, reranked), highlights gold evidence for QASPER questions, and compares the methods side by side. Answer generation is optional.
+
+```bash
+pip install -r requirements.txt
+
+# 1. Build app artifacts from the notebook's cached embeddings (no re-encoding).
+python scripts/build_artifacts.py --splits validation \
+    --vectors-from artifacts/preprocessing/<run_id>/validation_minilm_<hash>.npz
+
+# 2. Check the package reproduces the notebook's validation numbers.
+python scripts/regression_check.py --notebook-dir artifacts/preprocessing/<run_id>
+
+# 3. Run the app.
+streamlit run app.py
+```
+
+Without `--vectors-from`, `build_artifacts.py` encodes every chunk with MiniLM (about 18 minutes for validation on CPU). To enable answers, set `OPENAI_API_KEY` in your environment or in `.streamlit/secrets.toml` (git-ignored). The generation experiment (top 5 versus top 10 chunks) has not been run, so the app's default of 5 is a placeholder.
+
+Chunks keep two text fields. `text` is the decoded token IDs (lowercase, wordpiece spacing) that BM25, the embeddings and the reranker used. `display_text` is the original paragraph text for the same window and is what the app and the generator show.
+
+Run the tests with `pip install -r requirements-dev.txt && pytest`.
 
 ## Limitations and next steps
 
