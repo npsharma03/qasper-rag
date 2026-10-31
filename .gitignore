@@ -3,3 +3,7 @@ artifacts/
 .ipynb_checkpoints/
 __pycache__/
 .env
+.streamlit/secrets.toml
+.pytest_cache/
+.venv/
+venv/

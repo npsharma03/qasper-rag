@@ -1,0 +1,10 @@
+# Runtime: notebook, scripts and app
+streamlit>=1.36
+pandas
+numpy
+pyarrow
+rank_bm25
+tqdm
+transformers
+sentence-transformers   # installs torch
+openai                  # optional: only needed for answer generation
